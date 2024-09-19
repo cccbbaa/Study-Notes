@@ -70,7 +70,7 @@ union _MMPTE {
 
 ​	待转换的32位虚拟地址从逻辑上可划分为4部分。最低的12位将“照原样”用于选择页面中的特定字节。转换过程首先从每颗处理器上的一个PDPT开始它会始终驻留在物理内存中。(否则系统将找不到它)它的物理地址存储在每颗处理器的KPROCESS结构中。对于当前执行的进程，一个特殊的x86寄存器CR3存储了该进程的这个值(正是借助这个值，线程才得以访问虚拟地址)。这意味着当某颗CPU进行上下文切换时，如果新老线程运行在不同进程中，则必须向CR3 寄存器载入源自KROCESS结构的新进程页目录指针地址。PDPT 必须与 32字节的边界对齐，同时必须位于物理内存的前4GB中(因为x86体系结构的CR3依然是32位的寄存器)。
 
-<img src=".\Windows Address translation.assets\image-20230328195509541.png" alt="image-20230328195509541"  />
+<img src=".\Windows%20Address%20translation.assets\image-20230328195509541.png" alt="image-20230328195509541"  />
 
 按照上图所示的布局，将虚拟地址转换为物理地址的顺序如下。
 
@@ -92,7 +92,7 @@ union _MMPTE {
 
 ​	页目录和页表的布局基本相同。我们可以使用内核模式调试器的!pte 命令查看PTE，有效PTE 包含两个主要字段:包含数据的物理页面(即页面在内存中的物理地址)的PFN描述页面状态和保护属性的某些标志，如下图：
 
-![image-20230328200624956](.\Windows Address translation.assets\image-20230328200624956.png)
+![image-20230328200624956](./Windows%20Address%20translation.assets/image-20230328200624956.png)
 
 无论PTE是否有效，上图所示的“软件”和“保留”位都会被CPU中的内存管理单元(MMU)所忽略。这些位的存储和解读都由内存管理器负责。下表简要描述了有效PTE 中，由硬件定义的位。
 
@@ -137,7 +137,7 @@ union _MMPTE {
 
 ​	由于对每个虚拟地址的引用都必须进行 3 次额外的内存查找，这会将所需内存带宽增大4 倍进而影响到性能，因此所有 CPU 都会缓存地址转换结果，避免在重复访问相同地址时重复转换。这种缓存是一种由联合存储器 (associative memory) 组成的数组，名为地址转换旁视缓冲区(Translation Lookaside Buffer，TLB)。联合存储器是一种向量，其中包含的单元可以并发读取并与目标值进行对比。在 TLB 中，向量包含了大部分常用页面的虚拟到物理页面映射，如下图所示，还包含了应用于每个页面的页面保护、大小、属性等信息。TLB 中的每个项可视作一种缓存项，使用标签保存了虚拟地址的一部分，而这些项的数据部分保存了物理页面号、保护字段和有效位，通常还会包含一个 Dirty 位，用于代表该缓存PTE所对应的页面条件。如果PTE的全局位已设置(Windows会为对所有进程可见的系统空间页进行此设置)，则TLB 项在进程上下文切换时就不会被视作无效。
 
-![image-20230328204012032](.\Windows Address translation.assets\image-20230328204012032.png)
+![image-20230328204012032](./Windows%20Address%20translation.assets/image-20230328204012032.png)
 
 ### x64 虚拟地址转换
 
@@ -145,19 +145,19 @@ union _MMPTE {
 
 ​	X64 体系结构的当前实现限制了虚拟地址为48位。这48 位虚拟地址的组成部分,以及地址转换过程中不同组成部分之间的关系如图 5-36所示，x64 硬件PTE的格式如图5-37所示。
 
-![image-20230328204832509](.\Windows Address translation.assets\image-20230328204832509.png)
+![image-20230328204832509](./Windows%20Address%20translation.assets/image-20230328204832509.png)
 
-![image-20230328204849087](.\Windows Address translation.assets\image-20230328204849087.png)
+![image-20230328204849087](./Windows%20Address%20translation.assets/image-20230328204849087.png)
 
 ### ARM 虚拟地址转换
 
 ARM 32位处理器的虚拟地址转换使用了一种包含 1024 项的单个页目录，每个项的大小为32位。ARM虚拟地址转换结构如图 5-38 所示。
 
-![image-20230328205014306](.\Windows Address translation.assets\image-20230328205014306.png)
+![image-20230328205014306](./Windows%20Address%20translation.assets/image-20230328205014306.png)
 
 ​	每个进程有一个页目录，其物理地址存储在 TTBR 寄存器中(类似于x86/x64的CR3寄存器)。虚拟地址中的10个最高位选择的PDE可能指向1024个页表中的一个表。虚拟地址的最后10位将选择一个特定的PTE。每个有效的PTE可指向物理内存中页面的起始位置，并由虚拟地址中随后的12 位提供偏移量(与x86和x64 的情况类似)。图5-38示的结构还暗示了可寻址的物理内存为4GB，因为每个PTE(32位)都小于x86/x64(64位)，并且实际上只有 20位会用于 PFN。ARM 处理器也支持 PAE 模式(与x86类似),但 Windows 并未使用该功能。未来的 Windows 版本也许会支持ARM64 位体系结构，进而缓解物理地址方面的局限，并大幅增加进程和系统的虚拟地址空间范围。
 
 ​	奇怪的是，有效PTE、PDE以及大页PDE的布局并不相同。图5-39展示了目前Windows所用的ARM v7的有效PTE布局。详细信息请参阅ARM官方文档。
 
-![image-20230328205307389](.\Windows Address translation.assets\image-20230328205307389.png)
+![image-20230328205307389](./Windows%20Address%20translation.assets/image-20230328205307389.png)
 
